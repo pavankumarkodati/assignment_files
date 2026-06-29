@@ -1,0 +1,58 @@
+{
+  "Comment": "Transient EMR cluster spec for 100x-1000x batch reprocessing. Launched on-demand by the orchestrator, runs the SAME bronze_to_silver.py as Glue, then auto-terminates. Uses Spot for task nodes to cut cost ~70%.",
+  "Name": "etl-heavy-batch",
+  "ReleaseLabel": "emr-7.1.0",
+  "Applications": [{ "Name": "Spark" }, { "Name": "Hadoop" }],
+  "LogUri": "s3://my-lakehouse/emr-logs/",
+  "ServiceRole": "EMR_DefaultRole",
+  "JobFlowRole": "EMR_EC2_DefaultRole",
+  "VisibleToAllUsers": true,
+
+  "Instances": {
+    "KeepJobFlowAliveWhenNoSteps": false,
+    "TerminationProtected": false,
+    "Ec2SubnetId": "subnet-xxxxxxxx",
+    "InstanceFleets": [
+      {
+        "Name": "primary",
+        "InstanceFleetType": "MASTER",
+        "TargetOnDemandCapacity": 1,
+        "InstanceTypeConfigs": [{ "InstanceType": "m6g.xlarge" }]
+      },
+      {
+        "Name": "core",
+        "InstanceFleetType": "CORE",
+        "TargetOnDemandCapacity": 4,
+        "InstanceTypeConfigs": [{ "InstanceType": "r6g.2xlarge" }]
+      },
+      {
+        "Name": "task-spot",
+        "InstanceFleetType": "TASK",
+        "TargetSpotCapacity": 40,
+        "LaunchSpecifications": {
+          "SpotSpecification": { "TimeoutDurationMinutes": 20, "TimeoutAction": "SWITCH_TO_ON_DEMAND" }
+        },
+        "InstanceTypeConfigs": [
+          { "InstanceType": "r6g.2xlarge", "WeightedCapacity": 1 },
+          { "InstanceType": "r6g.4xlarge", "WeightedCapacity": 2 },
+          { "InstanceType": "r5.2xlarge",  "WeightedCapacity": 1 }
+        ]
+      }
+    ]
+  },
+
+  "Configurations": [
+    {
+      "Classification": "spark-defaults",
+      "Properties": {
+        "spark.sql.adaptive.enabled": "true",
+        "spark.sql.adaptive.skewJoin.enabled": "true",
+        "spark.sql.adaptive.coalescePartitions.enabled": "true",
+        "spark.sql.shuffle.partitions": "2000",
+        "spark.dynamicAllocation.enabled": "true",
+        "spark.serializer": "org.apache.spark.serializer.KryoSerializer",
+        "spark.sql.files.maxPartitionBytes": "256m"
+      }
+    }
+  ]
+}

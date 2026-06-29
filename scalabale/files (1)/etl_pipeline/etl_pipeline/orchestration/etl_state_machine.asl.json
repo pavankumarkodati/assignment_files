@@ -1,0 +1,101 @@
+{
+  "Comment": "ETL orchestration: choose Glue or EMR by volume, run silver->gold, then trigger Snowflake.",
+  "StartAt": "RouteCompute",
+  "States": {
+    "RouteCompute": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.compute",
+          "StringEquals": "emr",
+          "Next": "RunOnEMR"
+        }
+      ],
+      "Default": "RunGlueBronzeToSilver"
+    },
+
+    "RunGlueBronzeToSilver": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::glue:startJobRun.sync",
+      "Parameters": {
+        "JobName": "bronze_to_silver",
+        "Arguments": {
+          "--RAW_BUCKET.$": "$.bucket",
+          "--SILVER_DATABASE": "silver",
+          "--RUN_DATE.$": "$.run_date"
+        }
+      },
+      "Retry": [
+        { "ErrorEquals": ["Glue.ConcurrentRunsExceededException"], "IntervalSeconds": 30, "MaxAttempts": 5, "BackoffRate": 2.0 }
+      ],
+      "Catch": [
+        { "ErrorEquals": ["States.ALL"], "Next": "NotifyFailure" }
+      ],
+      "Next": "RunGlueSilverToGold"
+    },
+
+    "RunGlueSilverToGold": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::glue:startJobRun.sync",
+      "Parameters": {
+        "JobName": "silver_to_gold",
+        "Arguments": {
+          "--SILVER_DATABASE": "silver",
+          "--GOLD_BUCKET.$": "$.bucket"
+        }
+      },
+      "Catch": [{ "ErrorEquals": ["States.ALL"], "Next": "NotifyFailure" }],
+      "Next": "RefreshSnowflake"
+    },
+
+    "RunOnEMR": {
+      "Comment": "Transient EMR cluster for 100x-1000x volumes; same PySpark logic.",
+      "Type": "Task",
+      "Resource": "arn:aws:states:::elasticmapreduce:addStep.sync",
+      "Parameters": {
+        "ClusterId.$": "$.emr_cluster_id",
+        "Step": {
+          "Name": "bronze_to_silver_emr",
+          "ActionOnFailure": "CONTINUE",
+          "HadoopJarStep": {
+            "Jar": "command-runner.jar",
+            "Args": [
+              "spark-submit", "--deploy-mode", "cluster",
+              "--conf", "spark.sql.adaptive.skewJoin.enabled=true",
+              "s3://my-lakehouse/code/bronze_to_silver.py",
+              "--RAW_BUCKET", "s3://my-lakehouse/bronze",
+              "--SILVER_DATABASE", "silver"
+            ]
+          }
+        }
+      },
+      "Catch": [{ "ErrorEquals": ["States.ALL"], "Next": "NotifyFailure" }],
+      "Next": "RefreshSnowflake"
+    },
+
+    "RefreshSnowflake": {
+      "Comment": "Snowpipe auto-ingests continuously; this Lambda forces a refresh + runs DQ checks and resumes Tasks if suspended.",
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "snowflake_refresh",
+        "Payload": { "stage": "gold", "run_date.$": "$.run_date" }
+      },
+      "Catch": [{ "ErrorEquals": ["States.ALL"], "Next": "NotifyFailure" }],
+      "Next": "Done"
+    },
+
+    "NotifyFailure": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "arn:aws:sns:us-east-1:<acct>:etl-alerts",
+        "Message.$": "$"
+      },
+      "Next": "Failed"
+    },
+
+    "Failed": { "Type": "Fail", "Error": "ETLFailed" },
+    "Done":   { "Type": "Succeed" }
+  }
+}
