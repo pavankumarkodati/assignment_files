@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="660" viewBox="0 0 1160 660" font-family="'Segoe UI', Arial, Helvetica, sans-serif" role="img" aria-label="Target architecture: AWS S3 to Snowflake">
+<title>Target architecture — AWS S3 to Snowflake</title>
+<desc>Four swimlanes: Sources, AWS lake on S3, Snowflake medallion (Bronze, Silver, Gold) with a governed semantic layer, and Consumers. Event-driven ingestion via SQS and Snowpipe; incremental refresh via Streams, Tasks and Dynamic Tables.</desc>
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#FBFBF9"/><stop offset="1" stop-color="#F3F4F6"/>
+  </linearGradient>
+  <linearGradient id="titleg" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="#4F46E5"/><stop offset="0.5" stop-color="#0E7490"/><stop offset="1" stop-color="#7C3AED"/>
+  </linearGradient>
+  <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+    <feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="#1F2937" flood-opacity="0.16"/>
+  </filter>
+  <marker id="arw" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M2 1.5L8 5L2 8.5" fill="none" stroke="#64748B" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+</defs>
+
+<rect x="0" y="0" width="1160" height="660" fill="url(#bg)"/>
+<text x="30" y="40" font-size="22" font-weight="700" fill="url(#titleg)">Target Architecture — AWS S3 → Snowflake</text>
+<text x="30" y="62" font-size="13" fill="#6B7280">Event-driven ingestion · medallion modeling · governed semantic layer</text>
+
+<!-- ===================== LANE PANELS ===================== -->
+<g>
+  <rect x="30"  y="86" width="242" height="430" rx="16" fill="#EEF0FE" stroke="#C7CBF6" stroke-width="1"/>
+  <rect x="316" y="86" width="242" height="430" rx="16" fill="#E8F1FB" stroke="#BBD7F1" stroke-width="1"/>
+  <rect x="602" y="86" width="242" height="430" rx="16" fill="#F4F4F1" stroke="#D9D9D2" stroke-width="1"/>
+  <rect x="888" y="86" width="242" height="430" rx="16" fill="#F2ECFD" stroke="#D9C9F6" stroke-width="1"/>
+</g>
+<!-- lane header chips -->
+<g font-size="13" font-weight="700" text-anchor="middle" fill="#ffffff">
+  <rect x="62"  y="98" width="178" height="30" rx="15" fill="#4F46E5"/><text x="151" y="118">SOURCES</text>
+  <rect x="348" y="98" width="178" height="30" rx="15" fill="#185FA5"/><text x="437" y="118">AWS LAKE · S3</text>
+  <rect x="634" y="98" width="178" height="30" rx="15" fill="#0B5CAB"/><text x="723" y="118">SNOWFLAKE</text>
+  <rect x="920" y="98" width="178" height="30" rx="15" fill="#7C3AED"/><text x="1009" y="118">CONSUMERS</text>
+</g>
+
+<!-- ===================== SOURCES ===================== -->
+<g filter="url(#shadow)">
+  <rect x="46" y="150" width="210" height="92" rx="11" fill="#ffffff" stroke="#C7CBF6"/>
+  <rect x="46" y="150" width="6" height="92" rx="3" fill="#4F46E5"/>
+</g>
+<text x="151" y="180" font-size="13.5" font-weight="700" fill="#1E1B4B" text-anchor="middle">Source feeds</text>
+<text x="151" y="202" font-size="11.5" fill="#4B5563" text-anchor="middle">CSV / JSON drops</text>
+<text x="151" y="220" font-size="11.5" fill="#4B5563" text-anchor="middle">APIs · DB extracts</text>
+
+<g filter="url(#shadow)">
+  <rect x="46" y="306" width="210" height="92" rx="11" fill="#ffffff" stroke="#C7CBF6"/>
+  <rect x="46" y="306" width="6" height="92" rx="3" fill="#4F46E5"/>
+</g>
+<text x="151" y="336" font-size="13.5" font-weight="700" fill="#1E1B4B" text-anchor="middle">Lambda / Glue</text>
+<text x="151" y="358" font-size="11.5" fill="#4B5563" text-anchor="middle">flatten · validate</text>
+<text x="151" y="376" font-size="11.5" fill="#4B5563" text-anchor="middle">lightweight transform</text>
+
+<!-- ===================== AWS LAKE ===================== -->
+<g filter="url(#shadow)">
+  <rect x="332" y="150" width="210" height="170" rx="11" fill="#ffffff" stroke="#BBD7F1"/>
+  <rect x="332" y="150" width="6" height="170" rx="3" fill="#185FA5"/>
+</g>
+<text x="441" y="178" font-size="13.5" font-weight="700" fill="#0C447C" text-anchor="middle">S3 data lake</text>
+<g font-size="11.5" text-anchor="middle">
+  <rect x="352" y="190" width="174" height="30" rx="7" fill="#E6F1FB" stroke="#9FC6EC"/><text x="439" y="209" fill="#0C447C">s3://lake-landing/</text>
+  <rect x="352" y="226" width="174" height="30" rx="7" fill="#E6F1FB" stroke="#9FC6EC"/><text x="439" y="245" fill="#0C447C">s3://lake-raw/</text>
+  <rect x="352" y="262" width="174" height="30" rx="7" fill="#E6F1FB" stroke="#9FC6EC"/><text x="439" y="281" fill="#0C447C">s3://lake-curated/</text>
+</g>
+<text x="439" y="309" font-size="10.5" fill="#5B7A99" text-anchor="middle" font-style="italic">partitioned by date</text>
+
+<!-- SQS chip -->
+<g filter="url(#shadow)">
+  <rect x="346" y="352" width="196" height="46" rx="10" fill="#FFF7E6" stroke="#E7B65A"/>
+</g>
+<text x="444" y="372" font-size="12.5" font-weight="700" fill="#8A5A06" text-anchor="middle">SQS</text>
+<text x="444" y="389" font-size="10.5" fill="#A06A12" text-anchor="middle">S3 event notification</text>
+
+<!-- ===================== SNOWFLAKE medallion ===================== -->
+<!-- Bronze -->
+<g filter="url(#shadow)"><rect x="618" y="150" width="210" height="56" rx="11" fill="#FAEEDA" stroke="#C98A1E"/><rect x="618" y="150" width="6" height="56" rx="3" fill="#A9690C"/></g>
+<text x="729" y="173" font-size="13" font-weight="700" fill="#633806" text-anchor="middle">RAW — Bronze</text>
+<text x="729" y="191" font-size="10.5" fill="#8A5A06" text-anchor="middle">raw · 1:1 with source · all text</text>
+<!-- Silver -->
+<g filter="url(#shadow)"><rect x="618" y="216" width="210" height="56" rx="11" fill="#ECECE6" stroke="#9A9A90"/><rect x="618" y="216" width="6" height="56" rx="3" fill="#6E6E66"/></g>
+<text x="729" y="239" font-size="13" font-weight="700" fill="#33332E" text-anchor="middle">STAGING — Silver</text>
+<text x="729" y="257" font-size="10.5" fill="#555550" text-anchor="middle">cleaned · conformed · typed</text>
+<!-- Gold -->
+<g filter="url(#shadow)"><rect x="618" y="282" width="210" height="56" rx="11" fill="#E6F2D5" stroke="#5C9226"/><rect x="618" y="282" width="6" height="56" rx="3" fill="#3B6D11"/></g>
+<text x="729" y="305" font-size="13" font-weight="700" fill="#27500A" text-anchor="middle">MART — Gold star</text>
+<text x="729" y="323" font-size="10.5" fill="#3B6D11" text-anchor="middle">facts + dimensions</text>
+<!-- Semantic -->
+<g filter="url(#shadow)"><rect x="618" y="356" width="210" height="86" rx="11" fill="#DEF3EC" stroke="#0F8E6F"/><rect x="618" y="356" width="6" height="86" rx="3" fill="#0B6E56"/></g>
+<text x="729" y="382" font-size="12.5" font-weight="700" fill="#085041" text-anchor="middle">Semantic View / dbt</text>
+<text x="729" y="400" font-size="12.5" font-weight="700" fill="#085041" text-anchor="middle">Semantic Layer</text>
+<text x="729" y="423" font-size="10.5" fill="#0F6E56" text-anchor="middle">governed metrics — defined once</text>
+
+<!-- Refresh engine band -->
+<g filter="url(#shadow)">
+  <rect x="618" y="456" width="210" height="46" rx="11" fill="#0B5CAB"/>
+</g>
+<text x="723" y="476" font-size="10.5" font-weight="700" fill="#ffffff" text-anchor="middle">Streams · Tasks · Dynamic Tables</text>
+<text x="723" y="493" font-size="10" fill="#CFE3F7" text-anchor="middle">incremental, declarative refresh</text>
+
+<!-- ===================== CONSUMERS ===================== -->
+<g filter="url(#shadow)"><rect x="904" y="156" width="210" height="74" rx="11" fill="#ffffff" stroke="#D9C9F6"/><rect x="904" y="156" width="6" height="74" rx="3" fill="#7C3AED"/></g>
+<text x="1009" y="184" font-size="13.5" font-weight="700" fill="#3B1E78" text-anchor="middle">BI dashboards</text>
+<text x="1009" y="206" font-size="11" fill="#5B4690" text-anchor="middle">Tableau · Power BI · Sigma</text>
+
+<g filter="url(#shadow)"><rect x="904" y="248" width="210" height="74" rx="11" fill="#ffffff" stroke="#D9C9F6"/><rect x="904" y="248" width="6" height="74" rx="3" fill="#7C3AED"/></g>
+<text x="1009" y="276" font-size="13.5" font-weight="700" fill="#3B1E78" text-anchor="middle">Cortex Analyst</text>
+<text x="1009" y="298" font-size="11" fill="#5B4690" text-anchor="middle">natural language → SQL</text>
+
+<g filter="url(#shadow)"><rect x="904" y="340" width="210" height="74" rx="11" fill="#ffffff" stroke="#D9C9F6"/><rect x="904" y="340" width="6" height="74" rx="3" fill="#7C3AED"/></g>
+<text x="1009" y="368" font-size="13.5" font-weight="700" fill="#3B1E78" text-anchor="middle">Notebooks</text>
+<text x="1009" y="390" font-size="11" fill="#5B4690" text-anchor="middle">data science · ML</text>
+
+<!-- ===================== FLOW ARROWS ===================== -->
+<g stroke="#64748B" stroke-width="2" fill="none">
+  <!-- source feeds -> S3 -->
+  <path d="M256,196 H332" marker-end="url(#arw)"/>
+  <!-- Lambda/Glue <-> SQS -->
+  <path d="M256,374 H346" marker-end="url(#arw)" marker-start="url(#arw)"/>
+  <!-- SQS <-> S3 (event loop) -->
+  <path d="M444,352 V320" marker-end="url(#arw)" marker-start="url(#arw)"/>
+  <!-- S3 -> Snowflake RAW (Snowpipe) -->
+  <path d="M542,178 H618" marker-end="url(#arw)"/>
+  <!-- refresh engine -> up into Silver/Gold (left edge route) -->
+  <path d="M610,456 V244 H618" marker-end="url(#arw)"/>
+  <!-- semantic -> consumers -->
+  <path d="M828,392 H866 V193 H904" marker-end="url(#arw)"/>
+  <path d="M828,399 H884 V285 H904" marker-end="url(#arw)"/>
+  <path d="M828,406 H866 V377 H904" marker-end="url(#arw)"/>
+</g>
+<!-- arrow labels -->
+<text x="580" y="170" font-size="10.5" font-weight="600" fill="#0B5CAB" text-anchor="middle">Snowpipe</text>
+<text x="580" y="349" font-size="9.5" fill="#8A5A06" text-anchor="middle"></text>
+
+<!-- ===================== LEGEND ===================== -->
+<g font-size="11" fill="#4B5563">
+  <text x="30" y="560" font-size="11.5" font-weight="700" fill="#374151">Medallion tiers:</text>
+  <rect x="140" y="551" width="13" height="13" rx="3" fill="#FAEEDA" stroke="#C98A1E"/><text x="159" y="561">Bronze (raw)</text>
+  <rect x="248" y="551" width="13" height="13" rx="3" fill="#ECECE6" stroke="#9A9A90"/><text x="267" y="561">Silver (cleaned)</text>
+  <rect x="372" y="551" width="13" height="13" rx="3" fill="#E6F2D5" stroke="#5C9226"/><text x="391" y="561">Gold (modeled)</text>
+  <rect x="492" y="551" width="13" height="13" rx="3" fill="#DEF3EC" stroke="#0F8E6F"/><text x="511" y="561">Semantic (governed)</text>
+</g>
+<line x1="30" y1="578" x2="1130" y2="578" stroke="#E5E7EB" stroke-width="1"/>
+<text x="30" y="600" font-size="10.5" fill="#9CA3AF">Decoupled, idempotent stages — raw S3 zone is immutable and replayable; every recovery is a replay, not a rebuild.</text>
+</svg>
